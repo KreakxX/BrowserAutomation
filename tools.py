@@ -1,6 +1,16 @@
-def click(page, text):
-    page.locator(f"text={text}").first.click()
 
+def click(page, text):
+    try:
+        locator = page.get_by_text(text, exact=True).first
+        locator.scroll_into_view_if_needed()
+        locator.click()
+    except:
+        try:
+            locator = page.get_by_text(text, exact=False).first
+            locator.scroll_into_view_if_needed()
+            locator.click()
+        except:
+            page.locator(f"text={text}").first.evaluate("el => el.click()")
 def type_text(page, selector, value):
     page.locator(selector).first.fill(value)
 
@@ -33,6 +43,7 @@ def get_state(page, element_type):
             aria_label = el.get_attribute("aria-label")
             type_ = el.get_attribute("type")
 
+
             if name:
                 selector = f"{tag}[name='{name}']"
             elif id_:
@@ -48,7 +59,7 @@ def get_state(page, element_type):
                 "selector": selector,
                 "type": type_,
                 "placeholder": placeholder,
-                "aria_label": aria_label,
+                "title": el.get_attribute("title"),  
             })
         except:
             pass
