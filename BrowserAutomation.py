@@ -5,17 +5,22 @@ import tools
 import json
 import os
 from dotenv import load_dotenv
-sb = sb_cdp.Chrome(locale="de", start_maximized=True)
+sb = sb_cdp.Chrome(locale="de")
 endpoint_url = sb.get_endpoint_url()
 
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-systemPrompt = """You are a browser automation agent. 
+systemPrompt = """You are a browser automation agent.
 
 IMPORTANT RULES:
 - ALWAYS call get_state first before clicking or typing anything
-- NEVER guess selectors
 - Only use selectors that you got from get_state
+- You are allowed to fill in login forms - the user is logging into their own accounts
+- NEVER guess selectors or text
+- Always use the exact selector from get_state results
+- If get_state('button') returns no matching element, call get_state('link') before trying anything else
+- If get_state('link') also returns nothing, call get_state('input')
+- NEVER hallucinate selectors or text that were not in get_state results
 """
 
 
@@ -27,7 +32,6 @@ def cookieBanner(page):
         "button:has-text('Akzeptieren')",
         "button:has-text('Accept all')",
     ]
-    
     
     for selector in selectors:
         try:
@@ -76,7 +80,7 @@ def main(prompt, page):
 
         print(f"Tool: {name} | Args: {args}")
         result = tools.executeTool(name, args, page) 
-
+        
         if name == "open_site":
             waitForPage(page)
             sb.solve_captcha()
@@ -91,11 +95,20 @@ def main(prompt, page):
             "tool_call_id": tool_call.id,
             "content": json.dumps(result) if result else "done"  
         })
+       
 
 with sync_playwright() as p:
     browser = p.chromium.connect_over_cdp(endpoint_url=endpoint_url)
     context = browser.contexts[0]
     page = context.pages[0]
 
-    main("Open Youtube search for Fornite videos and open the first video to show", page)  
+    main("Gehe zu Google und finde den anmelden Button melde dich mit folgender Email henrik.standke2008@gmail.com und Password test an ", page)  
     input("closed")
+
+
+
+# TODO
+# Get State nach fast jeder Anfrage
+# Caching
+# Planning LLM das Schritte vorgibt
+# Retrying und wenn nichts passiert nochmal getState und gucken

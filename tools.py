@@ -1,4 +1,3 @@
-
 def click(page, text):
     try:
         locator = page.get_by_text(text, exact=True).first
@@ -60,6 +59,8 @@ def get_state(page, element_type):
                 "type": type_,
                 "placeholder": placeholder,
                 "title": el.get_attribute("title"),  
+                "text": el.inner_text()[:50] if el.inner_text() else None  
+
             })
         except:
             pass
