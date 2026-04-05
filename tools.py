@@ -9,7 +9,11 @@ def click(page, text):
             locator.scroll_into_view_if_needed()
             locator.click()
         except:
-            page.locator(f"text={text}").first.evaluate("el => el.click()")
+           try: 
+                page.locator(f"text={text}").first.evaluate("el => el.click()")
+           except:
+             return "failed - element not found. Call get_state with a different element_type to find the correct selector."
+ 
 def type_text(page, selector, value):
     page.locator(selector).first.fill(value)
 
@@ -19,13 +23,22 @@ def press_enter(page, selector):
 def open_site(page, url):
    page.goto(url)
 
+def get_content(page):
+    locators = page.locator("p, h1, h2, h3").all()
+    content = [];
+    for el in locators:
+       text_content = el.inner_text().strip()[:30] if el.inner_text() else None
+       content.append(text_content)
+    return content;
+
+
 def get_state(page, element_type):
     if element_type == "button":
         locators = page.locator("button").all()
     elif element_type == "input":
         locators = page.locator("input, textarea").all()
     elif element_type == "link":
-        locators = page.locator("a").all()
+        locators = page.locator("a").all()   
     else:
         locators = page.locator(element_type).all()
 
@@ -41,6 +54,7 @@ def get_state(page, element_type):
             placeholder = el.get_attribute("placeholder")
             aria_label = el.get_attribute("aria-label")
             type_ = el.get_attribute("type")
+            text_content = el.inner_text().strip()[:30] if el.inner_text() else None
 
 
             if name:
@@ -51,6 +65,8 @@ def get_state(page, element_type):
                 selector = f"{tag}[aria-label='{aria_label}']"
             elif placeholder:
                 selector = f"{tag}[placeholder='{placeholder}']"
+            elif text_content:
+              selector = f"{tag}:has-text('{text_content}')"
             else:
                 continue
 
@@ -59,7 +75,7 @@ def get_state(page, element_type):
                 "type": type_,
                 "placeholder": placeholder,
                 "title": el.get_attribute("title"),  
-                "text": el.inner_text()[:50] if el.inner_text() else None  
+                "text": text_content
 
             })
         except:
@@ -69,7 +85,7 @@ def get_state(page, element_type):
 
 def executeTool(name, args, page):
     if name == "click":
-      click(page, args["text"])
+      return click(page, args["text"])
     elif name == "type_text":
       type_text(page, args["selector"], args["text"])
     elif name == "press_enter":
@@ -78,6 +94,8 @@ def executeTool(name, args, page):
       open_site(page,args["url"])
     elif name == "get_state":
         return get_state(page, args["element_type"])
+    elif name == "get_content":
+        return get_content(page);
        
 
 tools = [
@@ -135,6 +153,16 @@ tools = [
                     "url": {"type": "string", "description": "the url to open"},
                 },
                 "required": ["url"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_content",
+            "description": "get the Content of a Page",
+            "parameters": {
+                "type": "object",
             }
         }
     },

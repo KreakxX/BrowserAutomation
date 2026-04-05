@@ -20,7 +20,9 @@ IMPORTANT RULES:
 - Always use the exact selector from get_state results
 - If get_state('button') returns no matching element, call get_state('link') before trying anything else
 - If get_state('link') also returns nothing, call get_state('input')
-- NEVER hallucinate selectors or text that were not in get_state results
+- NEVER hallucinate selectors or text that were not in get_state results 
+- You are NOT allowed to click or type until get_state returns at least one useful element
+- If get_state returns nothing useful, you MUST keep trying different element_types until you find something
 """
 
 
@@ -65,7 +67,8 @@ def main(prompt, page):
             model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=messages,
             tools=tools.tools,
-            tool_choice="auto"
+            tool_choice="auto",
+            seed=42
         )
 
         choice = response.choices[0].message
@@ -80,20 +83,31 @@ def main(prompt, page):
 
         print(f"Tool: {name} | Args: {args}")
         result = tools.executeTool(name, args, page) 
-        
+        print(result)
         if name == "open_site":
             waitForPage(page)
             sb.solve_captcha()
 
-        if name == "click":
-            page.wait_for_timeout(1000)
-            cookieBanner(page)
+        if name == "click" or name == "type_text":
+          page.wait_for_timeout(1000)
+          cookieBanner(page)
+          messages.append({"role": "assistant", "content": None, "tool_calls": [tool_call]})
+          messages.append({
+          "role": "tool",
+          "tool_call_id": tool_call.id,
+          "content": result if result else "done"  
+          })
+          messages.append({
+          "role": "user",
+          "content": "Action done. You MUST call get_state now before doing anything else. If the result is empty or has no matching element, call get_state again with a different element_type."
+          })
+          continue  
 
         messages.append({"role": "assistant", "content": None, "tool_calls": [tool_call]})
         messages.append({
-            "role": "tool",
-            "tool_call_id": tool_call.id,
-            "content": json.dumps(result) if result else "done"  
+        "role": "tool",
+        "tool_call_id": tool_call.id,
+        "content": json.dumps(result) if result else "done"
         })
        
 
@@ -102,13 +116,15 @@ with sync_playwright() as p:
     context = browser.contexts[0]
     page = context.pages[0]
 
-    main("Gehe zu Google und finde den anmelden Button melde dich mit folgender Email henrik.standke2008@gmail.com und Password test an ", page)  
+    main("Open the Expo Docs page and go to Create a project and than get all the page content and summarize it", page)  
     input("closed")
 
 
 
 # TODO
-# Get State nach fast jeder Anfrage
 # Caching
 # Planning LLM das Schritte vorgibt
 # Retrying und wenn nichts passiert nochmal getState und gucken
+# multiple getState on Login Page for example
+# Agent Task, Last Result, Context, next Task better flow Token Optimization
+# getContent Tool
