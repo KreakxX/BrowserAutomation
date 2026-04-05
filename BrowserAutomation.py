@@ -23,10 +23,14 @@ IMPORTANT RULES:
 - NEVER hallucinate selectors or text that were not in get_state results 
 - You are NOT allowed to click or type until get_state returns at least one useful element
 - If get_state returns nothing useful, you MUST keep trying different element_types until you find something
+- When clicking, you can use either the text or the aria_label from get_state results
+- After typing into a search field, press Enter instead of looking for a search button
 """
 
 
 def cookieBanner(page):
+    
+
     selectors = [
         "button[aria-label*='akzeptieren']",
         "button[aria-label*='akzeptieren']",
@@ -56,7 +60,12 @@ def waitForPage(page):
 
   cookieBanner(page)
 
-def main(prompt, page):
+def main(prompt, page, context):
+
+    pages = [page] 
+    current_page = page
+
+
     messages = [
         {"role": "system", "content": systemPrompt},
         {"role": "user", "content": prompt}
@@ -82,15 +91,35 @@ def main(prompt, page):
         args = json.loads(tool_call.function.arguments)
 
         print(f"Tool: {name} | Args: {args}")
-        result = tools.executeTool(name, args, page) 
+        result = tools.executeTool(name, args, current_page, context) 
         print(result)
         if name == "open_site":
-            waitForPage(page)
+            waitForPage(current_page)
             sb.solve_captcha()
+        
+        if name == "open_tab":
+            current_page = result
+            pages.append(result)
+            messages.append({"role": "assistant", "content": None, "tool_calls": [tool_call]})
+            messages.append({
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": f"New tab opened with url: {result.url}" 
+            })
+            continue        
+        if name == "switch_tab":
+            current_page = result
+            messages.append({"role": "assistant", "content": None, "tool_calls": [tool_call]})
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": f"Switched to tab: {result.url}"
+            })
+            continue
 
-        if name == "click" or name == "type_text":
-          page.wait_for_timeout(1000)
-          cookieBanner(page)
+        if name == "click" or name == "type_text" or name == "open_site":
+          current_page.wait_for_timeout(1000)
+          cookieBanner(current_page)
           messages.append({"role": "assistant", "content": None, "tool_calls": [tool_call]})
           messages.append({
           "role": "tool",
@@ -116,7 +145,7 @@ with sync_playwright() as p:
     context = browser.contexts[0]
     page = context.pages[0]
 
-    main("Open the Expo Docs page and go to Create a project and than get all the page content and summarize it", page)  
+    main("Go To youtube search for Fornite and click on the first video, afterwards create a new Google Tab and search for Fornite Skins", page, context)  
     input("closed")
 
 
@@ -125,6 +154,9 @@ with sync_playwright() as p:
 # Caching
 # Planning LLM das Schritte vorgibt
 # Retrying und wenn nichts passiert nochmal getState und gucken
-# multiple getState on Login Page for example
 # Agent Task, Last Result, Context, next Task better flow Token Optimization
-# getContent Tool
+# switch Tab, close Tab, open Tab, select option, clear input, upload file
+# mehrere Chat Inputs zu einem Browser
+# load cookies etc to have a real Browser and try connecting more
+
+# GET STATE FOCUS Enter Hitting

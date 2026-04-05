@@ -1,18 +1,22 @@
 def click(page, text):
-    try:
-        locator = page.get_by_text(text, exact=True).first
-        locator.scroll_into_view_if_needed()
-        locator.click()
-    except:
+    methods = [
+        lambda: page.get_by_text(text, exact=True).first.click(timeout=1000),
+        lambda: page.get_by_text(text, exact=False).first.click(timeout=1000),
+        lambda: page.locator(f"[aria-label='{text}']").first.click(timeout=1000),
+        lambda: page.locator(f"[title='{text}']").first.click(timeout=1000),
+        lambda: page.locator(f"[aria-label*='{text}']").first.click(timeout=1000),
+        lambda: page.locator(f"text={text}").first.evaluate("el => el.click()"),
+    ]
+    
+    for method in methods:
         try:
-            locator = page.get_by_text(text, exact=False).first
-            locator.scroll_into_view_if_needed()
-            locator.click()
+            method()
+            print(f"[CLICK] Erfolgreich")
+            return "success"
         except:
-           try: 
-                page.locator(f"text={text}").first.evaluate("el => el.click()")
-           except:
-             return "failed - element not found. Call get_state with a different element_type to find the correct selector."
+            continue
+    
+    return "failed - element not found. Call get_state with a different element_type."
  
 def type_text(page, selector, value):
     page.locator(selector).first.fill(value)
@@ -27,9 +31,23 @@ def get_content(page):
     locators = page.locator("p, h1, h2, h3").all()
     content = [];
     for el in locators:
-       text_content = el.inner_text().strip()[:30] if el.inner_text() else None
+       text_content = el.inner_text().strip() if el.inner_text() else None
        content.append(text_content)
     return content;
+
+def open_tab(context,url):
+    newPage = context.new_page()
+    newPage.goto(url)
+    return newPage
+
+
+def switch_tab(context, index):
+    return context.pages[index]
+
+
+def scrape_site(page):
+    locators = page.locator("button, a, input, textarea, select, p, h1, h2, h3, span").all()
+    return locators;
 
 
 def get_state(page, element_type):
@@ -83,7 +101,7 @@ def get_state(page, element_type):
 
     return result
 
-def executeTool(name, args, page):
+def executeTool(name, args, page, context):
     if name == "click":
       return click(page, args["text"])
     elif name == "type_text":
@@ -96,6 +114,12 @@ def executeTool(name, args, page):
         return get_state(page, args["element_type"])
     elif name == "get_content":
         return get_content(page);
+    elif name == "scrape_site":
+        return scrape_site(page)
+    elif name == "open_tab":
+        return open_tab(context, args["url"])
+    elif name == "switch_tab":
+        return switch_tab(context, args["index"]);
        
 
 tools = [
@@ -156,11 +180,51 @@ tools = [
             }
         }
     },
+ {
+        "type": "function",
+        "function": {
+            "name": "switch_tab",
+            "description": "Switches to another tab",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "index": {"type": "number", "description": "the index of the tab"},
+                },
+                "required": ["index"]
+            }
+        }
+    },
+
+     {
+        "type": "function",
+        "function": {
+            "name": "open_tab",
+            "description": "Open a new Tab",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "the url to open in the new Tab"},
+                },
+                "required": ["url"]
+            }
+        }
+    },
+
     {
         "type": "function",
         "function": {
             "name": "get_content",
             "description": "get the Content of a Page",
+            "parameters": {
+                "type": "object",
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scrape_site",
+            "description": "Gets everything from a site, only use this when specifically asked for",
             "parameters": {
                 "type": "object",
             }
