@@ -11,11 +11,8 @@ endpoint_url = sb.get_endpoint_url()
 load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 systemPrompt = """You are a browser automation agent.
-
 IMPORTANT RULES:
 - ALWAYS call get_state first before clicking or typing anything
-- Only use selectors that you got from get_state
-- You are allowed to fill in login forms - the user is logging into their own accounts
 - NEVER guess selectors or text
 - Always use the exact selector from get_state results
 - If get_state('button') returns no matching element, call get_state('link') before trying anything else
@@ -27,10 +24,7 @@ IMPORTANT RULES:
 - After typing into a search field, press Enter instead of looking for a search button
 """
 
-
 def cookieBanner(page):
-    
-
     selectors = [
         "button[aria-label*='akzeptieren']",
         "button[aria-label*='akzeptieren']",
@@ -60,9 +54,29 @@ def waitForPage(page):
 
   cookieBanner(page)
 
-def main(prompt, page, context):
+def trim_messages(messages):
+    system = messages[0]
+    task   = messages[1]
+    rest   = messages[2:]
 
+    trimmed = []
+    for i, msg in enumerate(rest):
+        if msg.get("role") == "tool":
+            prev = next((m for m in reversed(trimmed) if m.get("role") == "assistant"), None)
+            if prev:
+                tc = (prev.get("tool_calls") or [None])[0]
+                tc_name = tc.function.name if hasattr(tc, "function") else tc.get("function", {}).get("name")
+                if tc_name == "get_state" and i < len(rest) - 1:
+                    trimmed.pop()
+                    continue
+        trimmed.append(msg)
+
+    return [system, task] + trimmed
+
+
+def main(prompt, page, context):
     pages = [page] 
+    total_tokens = 0
     current_page = page
 
 
@@ -72,6 +86,7 @@ def main(prompt, page, context):
     ]
 
     while True:
+        messages = trim_messages(messages)
         response = client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=messages,
@@ -79,11 +94,12 @@ def main(prompt, page, context):
             tool_choice="auto",
             seed=42
         )
-
+        total_tokens += response.usage.total_tokens
         choice = response.choices[0].message
 
         if not choice.tool_calls:
             print(choice.content)
+            print(f"[TOKENS] {total_tokens}")            
             break
 
         tool_call = choice.tool_calls[0]
@@ -118,7 +134,7 @@ def main(prompt, page, context):
             continue
 
         if name == "click" or name == "type_text" or name == "open_site":
-          current_page.wait_for_timeout(1000)
+          current_page.wait_for_timeout(2000)
           cookieBanner(current_page)
           messages.append({"role": "assistant", "content": None, "tool_calls": [tool_call]})
           messages.append({
@@ -127,8 +143,8 @@ def main(prompt, page, context):
           "content": result if result else "done"  
           })
           messages.append({
-          "role": "user",
-          "content": "Action done. You MUST call get_state now before doing anything else. If the result is empty or has no matching element, call get_state again with a different element_type."
+                "role": "user", 
+                "content": "Action done. If the task is complete, respond with a final summary. Otherwise YOU MUST call get_state to continue."
           })
           continue  
 
@@ -145,7 +161,7 @@ with sync_playwright() as p:
     context = browser.contexts[0]
     page = context.pages[0]
 
-    main("Go To youtube search for Fornite and click on the first video, afterwards create a new Google Tab and search for Fornite Skins", page, context)  
+    main("Go to Google and login with email henrik.standke2008@gmail.com and password test", page, context)  
     input("closed")
 
 
@@ -159,4 +175,4 @@ with sync_playwright() as p:
 # mehrere Chat Inputs zu einem Browser
 # load cookies etc to have a real Browser and try connecting more
 
-# GET STATE FOCUS Enter Hitting
+# Token Optimization 

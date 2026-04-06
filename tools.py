@@ -11,7 +11,6 @@ def click(page, text):
     for method in methods:
         try:
             method()
-            print(f"[CLICK] Erfolgreich")
             return "success"
         except:
             continue
@@ -40,6 +39,9 @@ def open_tab(context,url):
     newPage.goto(url)
     return newPage
 
+
+def close_tab(context, index):
+    print("test")
 
 def switch_tab(context, index):
     return context.pages[index]
@@ -71,8 +73,7 @@ def get_state(page, element_type):
             id_ = el.get_attribute("id")
             placeholder = el.get_attribute("placeholder")
             aria_label = el.get_attribute("aria-label")
-            type_ = el.get_attribute("type")
-            text_content = el.inner_text().strip()[:30] if el.inner_text() else None
+            text_content = el.inner_text().strip()[:80] if el.inner_text() else None
 
 
             if name:
@@ -90,14 +91,12 @@ def get_state(page, element_type):
 
             result.append({
                 "selector": selector,
-                "type": type_,
-                "placeholder": placeholder,
-                "title": el.get_attribute("title"),  
                 "text": text_content
-
             })
         except:
             pass
+    if element_type == "link":
+        result = [el for el in result if el.get("text") and len(el.get("text", "")) > 3]
 
     return result
 
