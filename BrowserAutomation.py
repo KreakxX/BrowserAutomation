@@ -12,7 +12,7 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 systemPrompt = """You are a browser automation agent.
 IMPORTANT RULES:
-- ALWAYS call get_state first before clicking or typing anything
+- ALWAYS call get_state first BEFORE clicking or typing anything
 - NEVER guess selectors or text
 - Always use the exact selector from get_state results
 - If get_state('button') returns no matching element, call get_state('link') before trying anything else
@@ -92,8 +92,9 @@ def main(prompt, page, context):
             messages=messages,
             tools=tools.tools,
             tool_choice="auto",
-            seed=42
+            seed=42,
         )
+        print(response.usage.total_tokens)
         total_tokens += response.usage.total_tokens
         choice = response.choices[0].message
 
@@ -144,7 +145,7 @@ def main(prompt, page, context):
           })
           messages.append({
                 "role": "user", 
-                "content": "Action done. If the task is complete, respond with a final summary. Otherwise YOU MUST call get_state to continue."
+                "content": "Action done. YOU MUST CALL get_state to get new context, EXCEPT you THINK you are DONE then STOP."
           })
           continue  
 
